@@ -1,127 +1,123 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>b1ack-fire — Animated Profile</title>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: black;
-      height: 100%;
-      width: 100%;
-    }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>b1ack-fire — Animated Profile</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    height: 100%;
+    background: black;
+    font-family: monospace;
+  }
 
-    canvas {
-      position: fixed;
-      top: 0;
-      left: 0;
-      z-index: 0;
-    }
+  canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 0;
+  }
 
-    .hacker {
-      position: absolute;
-      bottom: 60px;
-      left: 50%;
-      transform: translateX(-50%) rotateY(-10deg);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      z-index: 2;
-    }
+  #hacker {
+    position: absolute;
+    bottom: 5%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 380px;
+    transition: transform 0.1s;
+  }
 
-    .hoodie {
-      width: 160px;
-      height: 160px;
-      background: linear-gradient(145deg, #d3d3d3, #999);
-      border-radius: 50% 50% 40% 40%;
-      position: relative;
-    }
+  #greeting {
+    position: absolute;
+    top: 10%;
+    width: 100%;
+    text-align: center;
+    color: cyan;
+    font-size: 2em;
+    text-shadow: 0 0 20px cyan;
+  }
 
-    .laptop {
-      margin-top: -40px;
-      width: 180px;
-      height: 100px;
-      background: #1a1a1a;
-      border-radius: 10px;
-      position: relative;
-      box-shadow: 0 0 15px #0ff5;
-    }
+  .eye {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+  }
 
-    .logo {
-      position: absolute;
-      width: 40px;
-      bottom: 8px;
-      right: 8px;
-      opacity: 0.7;
-    }
-
-    .text {
-      position: absolute;
-      top: 20%;
-      left: 50%;
-      transform: translateX(-50%);
-      font-family: monospace;
-      font-size: 26px;
-      color: #00ffcc;
-      z-index: 3;
-      text-shadow: 0 0 10px #00ffcc;
-      white-space: nowrap;
-      transition: all 0.2s;
-    }
-
-  </style>
+  .pupil {
+    position: absolute;
+    background: black;
+    border-radius: 50%;
+    width: 10px;
+    height: 10px;
+    top: 6px;
+    left: 6px;
+    transition: all 0.05s;
+  }
+</style>
 </head>
 <body>
-  <canvas id="rain"></canvas>
-  <div class="text" id="greeting">Hi there 👋, visitor</div>
-  <div class="hacker">
-    <div class="hoodie"></div>
-    <div class="laptop">
-      <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" class="logo" alt="GitHub cat">
-    </div>
-  </div>
+<canvas id="matrix"></canvas>
 
-  <script>
-    // 🎬 Binary Rain
-    const canvas = document.getElementById("rain");
-    const ctx = canvas.getContext("2d");
-    canvas.height = window.innerHeight;
-    canvas.width = window.innerWidth;
+<div id="greeting">Hi there 👋, <span id="visitor">visitor</span></div>
+<img id="hacker" src="hacker.png" alt="hacker">
 
-    const chars = "01";
-    const fontSize = 16;
-    const columns = canvas.width / fontSize;
-    const drops = Array(Math.floor(columns)).fill(1);
+<div class="eye" id="eyeLeft" style="bottom: 200px; left: calc(50% - 35px);">
+  <div class="pupil" id="pupilLeft"></div>
+</div>
 
-    function draw() {
-      ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#00ffcc";
-      ctx.font = fontSize + "px monospace";
-      for (let i = 0; i < drops.length; i++) {
-        const text = chars.charAt(Math.floor(Math.random() * chars.length));
-        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-        if (drops[i] * fontSize > canvas.height && Math.random() > 0.98) drops[i] = 0;
-        drops[i]++;
-      }
+<div class="eye" id="eyeRight" style="bottom: 200px; left: calc(50% + 10px);">
+  <div class="pupil" id="pupilRight"></div>
+</div>
+
+<script>
+  // Binary rain
+  const c = document.getElementById("matrix");
+  const ctx = c.getContext("2d");
+  c.height = window.innerHeight;
+  c.width = window.innerWidth;
+
+  const chars = "01";
+  const fontSize = 14;
+  const columns = c.width / fontSize;
+  const drops = Array(Math.floor(columns)).fill(1);
+
+  function drawMatrix() {
+    ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = "#00FF99";
+    ctx.font = fontSize + "px monospace";
+    for (let i = 0; i < drops.length; i++) {
+      const text = chars[Math.floor(Math.random() * chars.length)];
+      ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+      if (drops[i] * fontSize > c.height && Math.random() > 0.975) drops[i] = 0;
+      drops[i]++;
     }
-    setInterval(draw, 80); // slower rain
+  }
+  setInterval(drawMatrix, 50);
 
-    // 🧠 Mouse-follow animation
-    const hacker = document.querySelector(".hacker");
-    document.addEventListener("mousemove", (e) => {
-      const screenW = window.innerWidth / 2;
-      const offset = (e.clientX - screenW) / 30;
-      hacker.style.transform = `translateX(-50%) rotateY(${offset}deg)`;
+  // Eye follow animation
+  const eyes = [
+    { eye: document.getElementById('eyeLeft'), pupil: document.getElementById('pupilLeft') },
+    { eye: document.getElementById('eyeRight'), pupil: document.getElementById('pupilRight') }
+  ];
+
+  document.addEventListener('mousemove', (e) => {
+    eyes.forEach(({ eye, pupil }) => {
+      const rect = eye.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+      const distance = Math.min(5, Math.hypot(e.clientX - centerX, e.clientY - centerY) / 50);
+      const x = Math.cos(angle) * distance * 10;
+      const y = Math.sin(angle) * distance * 10;
+      pupil.style.transform = `translate(${x}px, ${y}px)`;
     });
-
-    // 👋 Personalized greeting
-    const greet = document.getElementById("greeting");
-    const user = new URLSearchParams(window.location.search).get("user");
-    greet.textContent = user ? `Hi there 👋, ${user}!` : "Hi there 👋, visitor";
-  </script>
+  });
+</script>
 </body>
 </html>
