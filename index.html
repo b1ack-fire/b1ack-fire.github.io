@@ -1,124 +1,263 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>b1ack-fire — Animated Profile</title>
 <style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    height: 100%;
-    background: black;
-    font-family: monospace;
+  :root{
+    --binary-color: #07d7a0;
+    --edge-color-a: #60A5FA;
+    --edge-color-b: #6EE7B7;
+  }
+  html,body{
+    height:100%; margin:0; background:#000; font-family:monospace; overflow:hidden;
   }
 
-  canvas {
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 0;
+  /* matrix canvas */
+  canvas#matrix {
+    position:fixed; inset:0; z-index:0; display:block;
   }
 
+  /* greeting text */
+  #greeting{
+    position:fixed; top:6vh; left:50%; transform:translateX(-50%);
+    color:var(--binary-color); font-size:clamp(20px,3.2vw,36px);
+    text-shadow:0 0 18px rgba(6,200,170,0.18);
+    z-index:2;
+    white-space:nowrap;
+  }
+
+  /* hacker image (transparent) */
   #hacker {
-    position: absolute;
-    bottom: 5%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 380px;
-    transition: transform 0.1s;
+    position:fixed;
+    right:8vh; /* place to the right so we can show keyboard/laptop on left */
+    bottom:6vh;
+    width:380px; max-width:40vw;
+    z-index:3;
+    pointer-events:none;
+    transform-origin:center center;
   }
 
-  #greeting {
-    position: absolute;
-    top: 10%;
-    width: 100%;
-    text-align: center;
-    color: cyan;
-    font-size: 2em;
-    text-shadow: 0 0 20px cyan;
+  /* overlay for realistic laptop edge / glow */
+  #laptopEdge {
+    position:fixed;
+    z-index:4;
+    pointer-events:none;
+    border-radius:8px;
+    box-shadow: 0 6px 30px rgba(16,200,180,0.14);
+    mix-blend-mode:screen;
+  }
+  /* laptop edge styling (thin colored rim) */
+  #laptopEdge::before{
+    content:"";
+    position:absolute; inset:0;
+    border-radius:8px;
+    padding:4px;
+    background: linear-gradient(90deg, rgba(96,165,250,0.95), rgba(110,231,183,0.95));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    opacity:0.85;
   }
 
+  /* eye containers (invisible circles) */
   .eye {
-    position: absolute;
-    background: white;
-    border-radius: 50%;
-    width: 22px;
-    height: 22px;
+    position:fixed;
+    width:30px;
+    height:30px;
+    border-radius:50%;
+    z-index:5;
+    pointer-events:none;
+    /* visual guides for debugging - remove border in production */
+    /* border:1px dashed rgba(255,255,255,0.06); */
+    overflow:hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: rgba(255,255,255,0.02);
+  }
+  .pupil {
+    width:12px; height:12px;
+    background:#000; border-radius:50%;
+    transform:translate(0,0);
+    transition:transform 0.04s linear;
+    will-change:transform;
+    box-shadow: 0 0 6px rgba(0,0,0,0.6);
   }
 
-  .pupil {
-    position: absolute;
-    background: black;
-    border-radius: 50%;
-    width: 10px;
-    height: 10px;
-    top: 6px;
-    left: 6px;
-    transition: all 0.05s;
+  /* small responsive tweaks */
+  @media (max-width:720px){
+    #hacker { right:4vw; width:46vw; }
   }
 </style>
 </head>
 <body>
+
 <canvas id="matrix"></canvas>
 
 <div id="greeting">Hi there 👋, <span id="visitor">visitor</span></div>
-<img id="hacker" src="hacker.png" alt="hacker">
 
-<div class="eye" id="eyeLeft" style="bottom: 200px; left: calc(50% - 35px);">
-  <div class="pupil" id="pupilLeft"></div>
-</div>
+<!-- Hacker image (transparent background PNG). Put hacker.png in same folder as index.html -->
+<img id="hacker" src="hacker.png" alt="hacker with transparent background">
 
-<div class="eye" id="eyeRight" style="bottom: 200px; left: calc(50% + 10px);">
-  <div class="pupil" id="pupilRight"></div>
-</div>
+<!-- Laptop edge overlay: positioned with JS to match the laptop area of the image -->
+<div id="laptopEdge" aria-hidden="true"></div>
+
+<!-- Eyes: we'll place these exactly over the face using JS -->
+<div id="eyeLeft" class="eye"><div class="pupil" id="pupilLeft"></div></div>
+<div id="eyeRight" class="eye"><div class="pupil" id="pupilRight"></div></div>
 
 <script>
-  // Binary rain
-  const c = document.getElementById("matrix");
-  const ctx = c.getContext("2d");
-  c.height = window.innerHeight;
-  c.width = window.innerWidth;
+/* ----------------------
+   MATRIX / BINARY RAIN
+   ---------------------- */
+const canvas = document.getElementById('matrix');
+const ctx = canvas.getContext('2d', { alpha: true });
 
-  const chars = "01";
-  const fontSize = 14;
-  const columns = c.width / fontSize;
-  const drops = Array(Math.floor(columns)).fill(1);
+let W = 0, H = 0, cols=0, fontSize=16, drops = [];
+function setupCanvas(){
+  const dpr = window.devicePixelRatio || 1;
+  W = canvas.width = Math.floor(window.innerWidth * dpr);
+  H = canvas.height = Math.floor(window.innerHeight * dpr);
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  fontSize = Math.max(12, Math.round(window.innerWidth / 80));
+  cols = Math.ceil(window.innerWidth / fontSize);
+  drops = new Array(cols).fill(1).map(()=>Math.random()*window.innerHeight/fontSize);
+}
+window.addEventListener('resize', setupCanvas);
+setupCanvas();
 
-  function drawMatrix() {
-    ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
-    ctx.fillRect(0, 0, c.width, c.height);
-    ctx.fillStyle = "#00FF99";
-    ctx.font = fontSize + "px monospace";
-    for (let i = 0; i < drops.length; i++) {
-      const text = chars[Math.floor(Math.random() * chars.length)];
-      ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-      if (drops[i] * fontSize > c.height && Math.random() > 0.975) drops[i] = 0;
-      drops[i]++;
-    }
+const chars = '01';
+function drawMatrix(){
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  ctx.fillRect(0,0,window.innerWidth, window.innerHeight);
+  ctx.font = fontSize + 'px monospace';
+  for(let i=0;i<cols;i++){
+    const text = chars.charAt(Math.floor(Math.random()*chars.length));
+    // every Nth column a slightly brighter color
+    ctx.fillStyle = i % 10 === 0 ? 'rgba(10,220,190,0.95)' : 'rgba(7,215,160,0.8)';
+    const x = i * fontSize;
+    const y = drops[i] * fontSize;
+    ctx.fillText(text, x, y);
+    if(y > window.innerHeight && Math.random() > 0.995) drops[i] = 0;
+    drops[i] += 0.5 + Math.random()*0.6; // slower fall
   }
-  setInterval(drawMatrix, 50);
+}
+let matrixInterval = setInterval(drawMatrix, 40);
 
-  // Eye follow animation
-  const eyes = [
-    { eye: document.getElementById('eyeLeft'), pupil: document.getElementById('pupilLeft') },
-    { eye: document.getElementById('eyeRight'), pupil: document.getElementById('pupilRight') }
-  ];
+/* ----------------------
+   FACE / EYE POSITIONING
+   ---------------------- */
+const img = document.getElementById('hacker');
+const eyeLeft = document.getElementById('eyeLeft');
+const eyeRight = document.getElementById('eyeRight');
+const pupilLeft = document.getElementById('pupilLeft');
+const pupilRight = document.getElementById('pupilRight');
+const laptopEdge = document.getElementById('laptopEdge');
 
-  document.addEventListener('mousemove', (e) => {
-    eyes.forEach(({ eye, pupil }) => {
-      const rect = eye.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
-      const distance = Math.min(5, Math.hypot(e.clientX - centerX, e.clientY - centerY) / 50);
-      const x = Math.cos(angle) * distance * 10;
-      const y = Math.sin(angle) * distance * 10;
-      pupil.style.transform = `translate(${x}px, ${y}px)`;
-    });
+// These numbers are *relative offsets* from the top-left of the image (fractions).
+// They represent where each eye / laptop area is located on the source image.
+// You may need to tweak these fractions slightly if your generated image differs.
+const leftEyeOffset = { x: 0.38, y: 0.34 };   // 38% from left, 34% from top
+const rightEyeOffset = { x: 0.46, y: 0.34 };  // 46% from left, 34% from top
+const laptopOffset = { x: 0.06, y: 0.42, w: 0.52, h: 0.33 }; // laptop bounding box relative to image
+
+function placeElements(){
+  const r = img.getBoundingClientRect();
+  if(r.width === 0 || r.height === 0) return; // image not loaded yet
+
+  // compute absolute positions for eyes
+  const leftEyeX = r.left + leftEyeOffset.x * r.width;
+  const leftEyeY = r.top + leftEyeOffset.y * r.height;
+  const rightEyeX = r.left + rightEyeOffset.x * r.width;
+  const rightEyeY = r.top + rightEyeOffset.y * r.height;
+
+  // position eye containers centered on those points
+  const eyeSize = Math.round(Math.max(18, r.width * 0.06));
+  [eyeLeft, eyeRight].forEach(el => {
+    el.style.width = eyeSize + 'px';
+    el.style.height = eyeSize + 'px';
   });
+  eyeLeft.style.left = (leftEyeX - eyeSize/2) + 'px';
+  eyeLeft.style.top  = (leftEyeY - eyeSize/2) + 'px';
+  eyeRight.style.left = (rightEyeX - eyeSize/2) + 'px';
+  eyeRight.style.top  = (rightEyeY - eyeSize/2) + 'px';
+
+  // laptop edge overlay: position and size relative to image
+  const lx = r.left + laptopOffset.x * r.width;
+  const ly = r.top + laptopOffset.y * r.height;
+  const lw = laptopOffset.w * r.width;
+  const lh = laptopOffset.h * r.height;
+  laptopEdge.style.left = lx + 'px';
+  laptopEdge.style.top  = ly + 'px';
+  laptopEdge.style.width = lw + 'px';
+  laptopEdge.style.height = lh + 'px';
+  laptopEdge.style.border = '2px solid rgba(255,255,255,0.04)';
+  laptopEdge.style.background = 'linear-gradient(90deg, rgba(96,165,250,0.06), rgba(110,231,183,0.06))';
+  laptopEdge.style.borderRadius = Math.max(6, r.width*0.02) + 'px';
+  laptopEdge.style.boxShadow = '0 12px 40px rgba(10,200,170,0.08)';
+}
+
+// reposition elements after image loads and on resize
+img.addEventListener('load', placeElements);
+window.addEventListener('resize', placeElements);
+placeElements();
+
+/* ----------------------
+   EYE FOLLOW LOGIC
+   ---------------------- */
+function movePupil(eyeEl, pupilEl, clientX, clientY){
+  const rect = eyeEl.getBoundingClientRect();
+  const cx = rect.left + rect.width/2;
+  const cy = rect.top + rect.height/2;
+  const dx = clientX - cx;
+  const dy = clientY - cy;
+  const dist = Math.hypot(dx,dy);
+  // limit movement to a small circle inside the eye
+  const maxMove = Math.min(rect.width * 0.22, 8); // px
+  const factor = Math.min(1, dist / 200);
+  const nx = (dx / (dist || 1)) * maxMove * factor;
+  const ny = (dy / (dist || 1)) * maxMove * factor;
+  pupilEl.style.transform = `translate(${nx}px, ${ny}px)`;
+}
+
+// only move pupils if cursor is reasonably near the image, otherwise slowly center
+let idleCenterInterval;
+document.addEventListener('mousemove', (e) => {
+  clearInterval(idleCenterInterval);
+  movePupil(eyeLeft, pupilLeft, e.clientX, e.clientY);
+  movePupil(eyeRight, pupilRight, e.clientX, e.clientY);
+  // small subtle parallax on the image when mouse moves
+  const rect = img.getBoundingClientRect();
+  const centerX = rect.left + rect.width/2;
+  const dx = (e.clientX - centerX) / 60;
+  img.style.transform = `translateX(-50%) translateY(0) perspective(1000px) rotateY(${dx}deg)`;
+});
+
+// if mouse idle, slowly return pupils to center
+function startIdleCenter(){
+  idleCenterInterval = setInterval(()=>{
+    pupilLeft.style.transform = `translate(0px,0px)`;
+    pupilRight.style.transform = `translate(0px,0px)`;
+    img.style.transform = `translateX(-50%) translateY(0) perspective(1000px) rotateY(0deg)`;
+  }, 2200);
+}
+startIdleCenter();
+
+/* ----------------------
+   small accessibility & visitor name support
+   ---------------------- */
+const params = new URLSearchParams(window.location.search);
+const v = params.get('user') || params.get('visitor') || params.get('name') || 'visitor';
+document.getElementById('visitor').textContent = v;
+
+/* ----------------------
+   helpful: re-place elements after short delays (image smoothing)
+   ---------------------- */
+setTimeout(placeElements, 250);
+setTimeout(placeElements, 800);
 </script>
 </body>
 </html>
-
